@@ -1,30 +1,25 @@
 package cryptsetup
 
 import (
+	"fmt"
 	"syscall"
 )
 
 // CryptError is an error produced by libcryptsetup.
 type CryptError struct {
-	Message string
-	Level   int
-	Method  string
-	Errno   error
+	Messages []string
+	Errno    error
 }
 
 func (e CryptError) Error() string {
-	if e.Method == "" {
-		return e.Message
-	} else {
-		return e.Method + ": " + e.Message
-	}
+	return fmt.Sprintf("%s: %v", e.Errno, e.Messages)
 }
 
-func newError(negerrno int, message string) error {
+func newError(negerrno int, messages ...string) error {
 	if negerrno < 0 {
 		return CryptError{
-			Message: message,
-			Errno:   syscall.Errno(-negerrno),
+			Messages: messages,
+			Errno:    syscall.Errno(-negerrno),
 		}
 	}
 	return nil

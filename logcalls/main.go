@@ -4,25 +4,28 @@
 package main
 
 import (
-	"os"
-	"text/template"
 	"flag"
+	"os"
 	"path"
-	"time"
 	"strings"
+	"text/template"
+	"time"
 )
 
 // MethodParam is a parameter of a method
 type MethodParam struct {
 	// the C type of the parameter, to be converted automatically
 	// to corresponding Go types
-	Type string 
+	Type string
 
 	// the name of the parameter in the function
 	Name string
 
 	// pass this Go code as the argument to the C function
 	ForceArg string
+
+	// this parameter is unsafe
+	Unsafe bool
 }
 
 type Method struct {
@@ -41,33 +44,40 @@ type Method struct {
 }
 
 type Data struct {
-	// the time at which the sources are being generated, to be
-	// added in a comment
-	Now time.Time
-
-	// the namespace in which to place the generated C functions,
-	// this will be prepended along with an underscore to the the
-	// method names
-	Ns string
-
-	// the name of the Go package
+	Methods     []Method
+	Now         string
+	Ns          string
 	PackageName string
+	BaseName    string
+	Dir         string
+}
 
-	// the basename of the generated files
-	BaseName string
-
-	// the methods to be rebound
-	Methods []Method
+func init() {
+	flag.StringVar(&data.Now, "at", time.Now().String(), "the time to record the files were generated at")
+	flag.StringVar(&data.Ns, "ns", "gocrypt", "the namespace in which generated C functions will live")
+	pkg, ok := os.LookupEnv("GOPACKAGE")
+	if !ok {
+		pkg = "main"
+	}
+	flag.StringVar(&data.PackageName, "pkg", pkg, "the package name for the Go stub")
+	flag.StringVar(&data.BaseName, "base", "logcalls", "the basename of the files that will be generated")
+	flag.StringVar(&data.Dir, "d", "templates", "the directory where templates are")
 }
 
 var data = Data{
-	Now:         time.Now(),
-	Ns:          "gocrypt",
-	PackageName: "cryptsetup",
-	BaseName:    "logcalls",
 	Methods: []Method{
 		// formatting
-		{Name: "gocrypt_format_luks", Params: []MethodParam{}},
+		{Name: "crypt_format", Params: []MethodParam{
+			{Type: "const char *", Name: "format"},
+			{Type: "const char *", Name: "cipher"},
+			{Type: "const char *", Name: "cipher_mode"},
+			{Type: "const char *", Name: "uuid"},
+			{Type: "void *", Name: "volume_key"},
+			{Type: "size_t", Name: "volume_key_size",
+				ForceArg: "len(volume_key)"},
+			{Type: "void *", Name: "params",
+				Unsafe: true},
+		}},
 
 		// misc
 		{Name: "crypt_set_data_device", Params: []MethodParam{
@@ -202,32 +212,25 @@ func (p MethodParam) Value() string {
 // CType returns the Go mapping of the C datatype for a method
 // parameter.
 func (p MethodParam) CType() string {
-	s := p.Type
-
-	// remove qualifiers
-	s = strings.TrimPrefix(s, "const")
-
-	// add C. prefix
-	s = strings.TrimSpace(s)
-	s = "C." + s
-
-	// fix pointer position
-	starindex := strings.Index(s, "*")
-	if starindex >= 0 {
-		s = s[starindex:] + s[:starindex]
+	if p.Type == "void *" {
+		return "unsafe.Pointer"
 	}
-
-	// convert spaces to underscores
+	s := "C." + p.Type
+	for s[len(s)-1] == '*' {
+		s = "*" + s[:len(s)-1]
+	}
 	s = strings.TrimSpace(s)
 	s = strings.Replace(s, " ", "_", -1)
-
 	return s
 }
 
 // GoType returns the Go type used for the parameter.
 func (p MethodParam) GoType() string {
-	switch strings.TrimPrefix(p.Type, "const ") {
-	case "char *":
+	if p.Unsafe {
+		return "unsafe.Pointer"
+	}
+	switch p.Type {
+	case "const char *":
 		return "string"
 	case "void *":
 		return "[]byte"
@@ -251,13 +254,12 @@ func (d Data) HeaderGuard() string {
 	return strings.Replace(strings.ToUpper(d.FileName("h")), ".", "_", -1)
 }
 
-
-func Templates(dir string) (*template.Template, error) {
-	return template.ParseGlob(path.Join(dir, "template.*"))
+func Templates(data Data) (*template.Template, error) {
+	return template.ParseGlob(path.Join(data.Dir, "template.*"))
 }
 
-func Run(dir string) error {
-	tmpl, err := Templates(dir)
+func Run(data Data) error {
+	tmpl, err := Templates(data)
 	if err != nil {
 		return err
 	}
@@ -278,10 +280,8 @@ func Run(dir string) error {
 }
 
 func main() {
-	mydirectory := flag.String("d", "./templates", "the directory where templates can be found")
 	flag.Parse()
-
-	err := Run(*mydirectory)
+	err := Run(data)
 	if err != nil {
 		panic(err)
 	}

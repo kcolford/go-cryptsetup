@@ -4,7 +4,6 @@
 #include <libcryptsetup.h>
 #include <string.h>
 #include <stdlib.h>
-#include "gocryptsetup.h"
 
 void gocrypt_logstack_free(struct gocrypt_logstack *ls) {
   while (ls != NULL) {
@@ -25,9 +24,9 @@ static void gocrypt_log(int level, const char *msg, void *usrptr) {
 }
 
 
-int gocrypt_gocrypt_format_luks(struct gocrypt_logstack **ls, struct crypt_device *cd) {
+int gocrypt_crypt_format(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * format, const char * cipher, const char * cipher_mode, const char * uuid, void * volume_key, size_t volume_key_size, void * params) {
   crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = gocrypt_format_luks(cd);
+  int out = crypt_format(cd, format, cipher, cipher_mode, uuid, volume_key, volume_key_size, params);
   crypt_set_log_callback(cd, NULL, NULL);
   return out;
 }

@@ -1,9 +1,9 @@
+// -*- mode: go; gofmt-show-errors: nil; -*-
 package {{$.PackageName}}
 
 // #cgo pkg-config: libcryptsetup
 // #include <libcryptsetup.h>
 // #include <stdlib.h>
-// #include "gocryptsetup.h"
 // #include "{{$.FileName "h"}}"
 // void {{$.Ns}}_log_default(int, char *, void *);
 import "C"
@@ -25,16 +25,23 @@ func {{$.Ns}}_log_default(level C.int, msg *C.char, usrptr unsafe.Pointer) {
 	log.Print(C.GoString(msg))
 }
 
-{{define "declparam"}}{{end}}
-{{define "returnvalue"}}{{end}}
+func logMessages(ls *C.struct_{{$.Ns}}_logstack) []string {
+	if ls == nil {
+		return []string{}
+	}
+	return append(logMessages(ls->prev), C.GoString(ls->msg))
+}
 
 {{range .Methods}}
 func (d Device) {{.GoName}}({{range $k, $v := .DeclParams}}{{if $k}}, {{end}}{{$v.Name}} {{$v.GoType}}{{end}}) ({{with .Return}}out {{.}}, {{end}}err error) {
 	arglist := (*C.struct_{{$.Ns}}_logstack)(nil)
 	{{range .Params}}
 	{{if eq "string" (.GoType)}}
-	_{{.Name}} := C.CString({{.Value}})
-	defer C.free(unsafe.Pointer(_{{.Name}}))
+	_{{.Name}} := (*C.char)(nil)
+	if {{.Value}} == "" {
+		_{{.Name}} = C.CString({{.Value}})
+		defer C.free(unsafe.Pointer(_{{.Name}}))
+	}
 	{{else if eq "[]byte" (.GoType)}}
 	_{{.Name}} := unsafe.Pointer(nil)
 	if {{.Value}} != nil {
@@ -54,15 +61,7 @@ func (d Device) {{.GoName}}({{range $k, $v := .DeclParams}}{{if $k}}, {{end}}{{$
 		{{end}})
 	defer C.{{$.Ns}}_logstack_free(arglist)
 	
-	msg := ""
-	for i := arglist; i != nil; i = i.prev {
-		msg = C.GoString(i.message) + "\n" + msg
-	}
-	if ival < 0 {
-		err = newError(int(ival), msg)
-		return
-	}
-	
+	err = newError(int(ival), logMessages(arglist)...)
 	{{with .Return}}out = ({{.}})(ival){{end}}
 	return
 }

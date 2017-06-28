@@ -16,4 +16,5 @@ func BenchmarkLibrary(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer d.Close()
+
 }

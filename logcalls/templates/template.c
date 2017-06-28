@@ -4,7 +4,6 @@
 #include <libcryptsetup.h>
 #include <string.h>
 #include <stdlib.h>
-#include "gocryptsetup.h"
 
 void {{$.Ns}}_logstack_free(struct {{$.Ns}}_logstack *ls) {
   while (ls != NULL) {

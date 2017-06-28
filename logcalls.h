@@ -13,7 +13,7 @@ struct gocrypt_logstack {
 void gocrypt_logstack_free(struct gocrypt_logstack *);
 
 
-int gocrypt_gocrypt_format_luks(struct gocrypt_logstack **, struct crypt_device *);
+int gocrypt_crypt_format(struct gocrypt_logstack **, struct crypt_device *, const char *, const char *, const char *, const char *, void *, size_t, void *);
 
 int gocrypt_crypt_set_data_device(struct gocrypt_logstack **, struct crypt_device *, const char *);
 
