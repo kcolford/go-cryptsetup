@@ -9,4 +9,4 @@
 // an intel celeron).
 package cryptsetup
 
-//go:generate go run logcalls/main.go
+//go:generate go run logcalls/main.go -d logcalls/templates
