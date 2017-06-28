@@ -42,7 +42,7 @@ func (d Device) {{.GoName}}({{range $k, $v := .DeclParams}}{{if $k}}, {{end}}{{$
 		defer C.free(_{{.Name}})
 	}
 	{{else}}
-	_{{.Name}} := C.{{.Type}}({{.Value}})
+	_{{.Name}} := ({{.CType}})({{.Value}})
 	{{end}}
 	{{end}}
 	

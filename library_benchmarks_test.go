@@ -4,19 +4,16 @@ import (
 	"testing"
 )
 
-func TestBasic(t *testing.T) {
+func BenchmarkLibrary(b *testing.B) {
 	f, err := NewTestFile()
 	if err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
 	defer f.Close()
+
 	d, err := NewDevice(f.Name())
 	if err != nil {
-		t.Fatal(err)
+		b.Fatal(err)
 	}
 	defer d.Close()
-	err = d.FormatLuks([]byte("password"))
-	if err != nil {
-		t.Fatal(err)
-	}
 }

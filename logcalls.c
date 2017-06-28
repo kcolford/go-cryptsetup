@@ -95,3 +95,31 @@ int gocrypt_crypt_activate_by_passphrase(struct gocrypt_logstack **ls, struct cr
   return out;
 }
 
+int gocrypt_crypt_activate_by_keyfile_offset(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * name, int keyslot, const char * keyfile, size_t keyfile_size, size_t keyfile_offset, uint32_t flags) {
+  crypt_set_log_callback(cd, gocrypt_log, ls);
+  int out = crypt_activate_by_keyfile_offset(cd, name, keyslot, keyfile, keyfile_size, keyfile_offset, flags);
+  crypt_set_log_callback(cd, NULL, NULL);
+  return out;
+}
+
+int gocrypt_crypt_deactivate(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * name) {
+  crypt_set_log_callback(cd, gocrypt_log, ls);
+  int out = crypt_deactivate(cd, name);
+  crypt_set_log_callback(cd, NULL, NULL);
+  return out;
+}
+
+int gocrypt_crypt_benchmark(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * cipher, const char * cipher_mode, size_t volume_key_size, size_t iv_size, size_t buffer_size, double * encryption_mbs, double * decryption_mbs) {
+  crypt_set_log_callback(cd, gocrypt_log, ls);
+  int out = crypt_benchmark(cd, cipher, cipher_mode, volume_key_size, iv_size, buffer_size, encryption_mbs, decryption_mbs);
+  crypt_set_log_callback(cd, NULL, NULL);
+  return out;
+}
+
+int gocrypt_crypt_benchmark_kdf(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * kdf, const char * hash, void * password, size_t password_size, void * salt, size_t salt_size, uint64_t * iterations_sec) {
+  crypt_set_log_callback(cd, gocrypt_log, ls);
+  int out = crypt_benchmark_kdf(cd, kdf, hash, password, password_size, salt, salt_size, iterations_sec);
+  crypt_set_log_callback(cd, NULL, NULL);
+  return out;
+}
+

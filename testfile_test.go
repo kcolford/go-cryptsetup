@@ -1,36 +1,48 @@
 package cryptsetup
 
 import (
+	"testing"
 	"io/ioutil"
 	"os"
-	"testing"
 )
 
 const luksSize = 1049600
 
-func NewTestFile(t *testing.T) string {
+type TestFile struct {
+	name string
+}
+
+func (t TestFile) Name() string {
+	return t.name
+}
+
+func (t TestFile) Close() {
+	err := os.Remove(t.Name())
+	if err != nil {
+		panic(err)
+	}
+}
+
+func NewTestFile() (t TestFile, err error) {
 	f, err := ioutil.TempFile("", "cryptsetup-test")
 	if err != nil {
-		t.Fatal("new testfile", err)
+		return
 	}
 	defer f.Close()
 	err = f.Truncate(luksSize)
 	if err != nil {
-		t.Fatal("new testfile", err)
+		return
 	}
-	return f.Name()
-}
-
-func CloseTestFile(t *testing.T, f string) {
-	err := os.Remove(f)
-	if err != nil {
-		t.Error("close testfile", err)
-	}
+	t.name = f.Name()
+	return
 }
 
 func TestMakeTestfile(t *testing.T) {
-	t.Log("making testfile")
-	f := NewTestFile(t)
-	t.Log(f)
-	defer CloseTestFile(t, f)
+	f, err := NewTestFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	t.Log(f.Name())
 }
