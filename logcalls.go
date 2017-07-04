@@ -1,44 +1,23 @@
-// -*- mode: go; gofmt-show-errors: nil; -*-
+
 package cryptsetup
 
 // #cgo pkg-config: libcryptsetup
 // #include <libcryptsetup.h>
 // #include <stdlib.h>
 // #include "logcalls.h"
-// void gocrypt_log_default(int, char *, void *);
+// #include "log.h"
 import "C"
 import (
 	"unsafe"
-	"log"
 )
 
-// Setup a default logging function that uses the standard logger.
-func init() {
-	C.crypt_set_log_callback(
-		nil,
-		(*[0]byte)(C.gocrypt_log_default),
-		nil,
-	)
-}
-//export gocrypt_log_default
-func gocrypt_log_default(level C.int, msg *C.char, usrptr unsafe.Pointer) {
-	log.Print(C.GoString(msg))
-}
 
-func logMessages(ls *C.struct_gocrypt_logstack) []string {
-	if ls == nil {
-		return []string{}
-	}
-	return append(logMessages(ls->prev), C.GoString(ls->msg))
-}
-
-
-func (d Device) format(format string, cipher string, cipher_mode string, uuid string, volume_key []byte, params unsafe.Pointer) (err error) {
+func (d Device) format(format string, cipher string, cipher_mode string, uuid string, volume_key []byte, volume_key_size C.size_t, params unsafe.Pointer) (err error) {
 	arglist := (*C.struct_gocrypt_logstack)(nil)
 	
 	
 	_format := (*C.char)(nil)
-	if format == "" {
+	if format != "" {
 		_format = C.CString(format)
 		defer C.free(unsafe.Pointer(_format))
 	}
@@ -46,7 +25,7 @@ func (d Device) format(format string, cipher string, cipher_mode string, uuid st
 	
 	
 	_cipher := (*C.char)(nil)
-	if cipher == "" {
+	if cipher != "" {
 		_cipher = C.CString(cipher)
 		defer C.free(unsafe.Pointer(_cipher))
 	}
@@ -54,7 +33,7 @@ func (d Device) format(format string, cipher string, cipher_mode string, uuid st
 	
 	
 	_cipher_mode := (*C.char)(nil)
-	if cipher_mode == "" {
+	if cipher_mode != "" {
 		_cipher_mode = C.CString(cipher_mode)
 		defer C.free(unsafe.Pointer(_cipher_mode))
 	}
@@ -62,7 +41,7 @@ func (d Device) format(format string, cipher string, cipher_mode string, uuid st
 	
 	
 	_uuid := (*C.char)(nil)
-	if uuid == "" {
+	if uuid != "" {
 		_uuid = C.CString(uuid)
 		defer C.free(unsafe.Pointer(_uuid))
 	}
@@ -77,7 +56,7 @@ func (d Device) format(format string, cipher string, cipher_mode string, uuid st
 	
 	
 	
-	_volume_key_size := (C.size_t)(len(volume_key))
+	_volume_key_size := (C.size_t)(volume_key_size)
 	
 	
 	
@@ -103,9 +82,38 @@ func (d Device) format(format string, cipher string, cipher_mode string, uuid st
 		
 		_params,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
+	
+	return
+}
+
+func (d Device) load(requested_type string, params unsafe.Pointer) (err error) {
+	arglist := (*C.struct_gocrypt_logstack)(nil)
+	
+	
+	_requested_type := (*C.char)(nil)
+	if requested_type != "" {
+		_requested_type = C.CString(requested_type)
+		defer C.free(unsafe.Pointer(_requested_type))
+	}
+	
+	
+	
+	_params := (unsafe.Pointer)(params)
+	
+	
+	
+	ival := C.gocrypt_crypt_load(
+		&arglist,
+		d.cd,
+		
+		_requested_type,
+		
+		_params,
+		)
+	
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -115,7 +123,7 @@ func (d Device) setDataDevice(device string) (err error) {
 	
 	
 	_device := (*C.char)(nil)
-	if device == "" {
+	if device != "" {
 		_device = C.CString(device)
 		defer C.free(unsafe.Pointer(_device))
 	}
@@ -128,9 +136,8 @@ func (d Device) setDataDevice(device string) (err error) {
 		
 		_device,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -143,9 +150,8 @@ func (d Device) getRngType() (out int, err error) {
 		&arglist,
 		d.cd,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -155,7 +161,7 @@ func (d Device) setUuid(uuid string) (err error) {
 	
 	
 	_uuid := (*C.char)(nil)
-	if uuid == "" {
+	if uuid != "" {
 		_uuid = C.CString(uuid)
 		defer C.free(unsafe.Pointer(_uuid))
 	}
@@ -168,9 +174,8 @@ func (d Device) setUuid(uuid string) (err error) {
 		
 		_uuid,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -221,9 +226,8 @@ func (d Device) keyslotAddByPassphrase(keyslot int, passphrase []byte, new_passp
 		
 		_new_passphrase_size,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -280,9 +284,8 @@ func (d Device) keyslotChangeByPassphrase(keyslot_old int, keyslot_new int, pass
 		
 		_new_passphrase_size,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -296,7 +299,7 @@ func (d Device) keyslotAddByKeyfileOffset(keyslot int, keyfile string, keyfile_s
 	
 	
 	_keyfile := (*C.char)(nil)
-	if keyfile == "" {
+	if keyfile != "" {
 		_keyfile = C.CString(keyfile)
 		defer C.free(unsafe.Pointer(_keyfile))
 	}
@@ -312,7 +315,7 @@ func (d Device) keyslotAddByKeyfileOffset(keyslot int, keyfile string, keyfile_s
 	
 	
 	_new_keyfile := (*C.char)(nil)
-	if new_keyfile == "" {
+	if new_keyfile != "" {
 		_new_keyfile = C.CString(new_keyfile)
 		defer C.free(unsafe.Pointer(_new_keyfile))
 	}
@@ -345,9 +348,8 @@ func (d Device) keyslotAddByKeyfileOffset(keyslot int, keyfile string, keyfile_s
 		
 		_new_keyfile_offset,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -398,9 +400,8 @@ func (d Device) keyslotAddByVolumeKey(keyslot int, volume_key []byte, passphrase
 		
 		_passphrase_size,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -419,9 +420,8 @@ func (d Device) keyslotDestroy(keyslot int) (err error) {
 		
 		_keyslot,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -431,7 +431,7 @@ func (d Device) activateByPassphrase(name string, keyslot int, passphrase []byte
 	
 	
 	_name := (*C.char)(nil)
-	if name == "" {
+	if name != "" {
 		_name = C.CString(name)
 		defer C.free(unsafe.Pointer(_name))
 	}
@@ -472,9 +472,8 @@ func (d Device) activateByPassphrase(name string, keyslot int, passphrase []byte
 		
 		_flags,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -484,7 +483,7 @@ func (d Device) activateByKeyfileOffset(name string, keyslot int, keyfile string
 	
 	
 	_name := (*C.char)(nil)
-	if name == "" {
+	if name != "" {
 		_name = C.CString(name)
 		defer C.free(unsafe.Pointer(_name))
 	}
@@ -496,7 +495,7 @@ func (d Device) activateByKeyfileOffset(name string, keyslot int, keyfile string
 	
 	
 	_keyfile := (*C.char)(nil)
-	if keyfile == "" {
+	if keyfile != "" {
 		_keyfile = C.CString(keyfile)
 		defer C.free(unsafe.Pointer(_keyfile))
 	}
@@ -531,9 +530,8 @@ func (d Device) activateByKeyfileOffset(name string, keyslot int, keyfile string
 		
 		_flags,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	out = (int)(ival)
 	return
 }
@@ -543,7 +541,7 @@ func (d Device) deactivate(name string) (err error) {
 	
 	
 	_name := (*C.char)(nil)
-	if name == "" {
+	if name != "" {
 		_name = C.CString(name)
 		defer C.free(unsafe.Pointer(_name))
 	}
@@ -556,9 +554,8 @@ func (d Device) deactivate(name string) (err error) {
 		
 		_name,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -568,7 +565,7 @@ func (d Device) benchmark(cipher string, cipher_mode string, volume_key_size C.s
 	
 	
 	_cipher := (*C.char)(nil)
-	if cipher == "" {
+	if cipher != "" {
 		_cipher = C.CString(cipher)
 		defer C.free(unsafe.Pointer(_cipher))
 	}
@@ -576,7 +573,7 @@ func (d Device) benchmark(cipher string, cipher_mode string, volume_key_size C.s
 	
 	
 	_cipher_mode := (*C.char)(nil)
-	if cipher_mode == "" {
+	if cipher_mode != "" {
 		_cipher_mode = C.CString(cipher_mode)
 		defer C.free(unsafe.Pointer(_cipher_mode))
 	}
@@ -621,9 +618,8 @@ func (d Device) benchmark(cipher string, cipher_mode string, volume_key_size C.s
 		
 		_decryption_mbs,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }
@@ -633,7 +629,7 @@ func (d Device) benchmarkKdf(kdf string, hash string, password []byte, salt []by
 	
 	
 	_kdf := (*C.char)(nil)
-	if kdf == "" {
+	if kdf != "" {
 		_kdf = C.CString(kdf)
 		defer C.free(unsafe.Pointer(_kdf))
 	}
@@ -641,7 +637,7 @@ func (d Device) benchmarkKdf(kdf string, hash string, password []byte, salt []by
 	
 	
 	_hash := (*C.char)(nil)
-	if hash == "" {
+	if hash != "" {
 		_hash = C.CString(hash)
 		defer C.free(unsafe.Pointer(_hash))
 	}
@@ -694,9 +690,8 @@ func (d Device) benchmarkKdf(kdf string, hash string, password []byte, salt []by
 		
 		_iterations_sec,
 		)
-	defer C.gocrypt_logstack_free(arglist)
 	
-	err = newError(int(ival), logMessages(arglist)...)
+	err = newError(int(ival), logMessages(arglist))
 	
 	return
 }

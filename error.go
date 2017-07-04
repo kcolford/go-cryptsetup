@@ -2,6 +2,7 @@ package cryptsetup
 
 import (
 	"fmt"
+	"strings"
 	"syscall"
 )
 
@@ -12,10 +13,12 @@ type CryptError struct {
 }
 
 func (e CryptError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Errno, e.Messages)
+	return fmt.Sprintf("%s: %v", e.Errno, strings.Join(e.Messages, ""))
 }
 
-func newError(negerrno int, messages ...string) error {
+// newError creates a CryptError if the return value of a library
+// function indicates an error.
+func newError(negerrno int, messages []string) error {
 	if negerrno < 0 {
 		return CryptError{
 			Messages: messages,

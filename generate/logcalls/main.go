@@ -61,7 +61,7 @@ func init() {
 	}
 	flag.StringVar(&data.PackageName, "pkg", pkg, "the package name for the Go stub")
 	flag.StringVar(&data.BaseName, "base", "logcalls", "the basename of the files that will be generated")
-	flag.StringVar(&data.Dir, "d", "templates", "the directory where templates are")
+	flag.StringVar(&data.Dir, "d", ".", "the directory where templates are")
 }
 
 var data = Data{
@@ -72,9 +72,25 @@ var data = Data{
 			{Type: "const char *", Name: "cipher"},
 			{Type: "const char *", Name: "cipher_mode"},
 			{Type: "const char *", Name: "uuid"},
+
+			// XXX: note that we don't force this argument
+			// because volume_key can be nil (NULL) and we
+			// specify a length that will be generated,
+			// care must be taken that the []byte slice
+			// passed to volume_key matches the size
+			// passed to volume_key_size if volume_key is
+			// not nil
 			{Type: "void *", Name: "volume_key"},
-			{Type: "size_t", Name: "volume_key_size",
-				ForceArg: "len(volume_key)"},
+			{Type: "size_t", Name: "volume_key_size"},
+
+			// this can be a pointer to any of a number of
+			// types, therefore it must be managed as an
+			// unsafe pointer
+			{Type: "void *", Name: "params",
+				Unsafe: true},
+		}},
+		{Name: "crypt_load", Params: []MethodParam{
+			{Type: "const char *", Name: "requested_type"},
 			{Type: "void *", Name: "params",
 				Unsafe: true},
 		}},
@@ -83,7 +99,7 @@ var data = Data{
 		{Name: "crypt_set_data_device", Params: []MethodParam{
 			{Type: "const char *", Name: "device"},
 		}},
-		{Name: "crypt_get_rng_type", Params: []MethodParam{}, Return: "int"},
+		{Name: "crypt_get_rng_type", Return: "int"},
 		{Name: "crypt_set_uuid", Params: []MethodParam{
 			{Type: "const char *", Name: "uuid"},
 		}},
@@ -212,7 +228,7 @@ func (p MethodParam) Value() string {
 // CType returns the Go mapping of the C datatype for a method
 // parameter.
 func (p MethodParam) CType() string {
-	if p.Type == "void *" {
+	if p.Unsafe || p.Type == "void *" {
 		return "unsafe.Pointer"
 	}
 	s := "C." + p.Type
@@ -255,7 +271,7 @@ func (d Data) HeaderGuard() string {
 }
 
 func Templates(data Data) (*template.Template, error) {
-	return template.ParseGlob(path.Join(data.Dir, "template.*"))
+	return template.ParseGlob(path.Join(data.Dir, "_template.*"))
 }
 
 func Run(data Data) error {
@@ -270,7 +286,7 @@ func Run(data Data) error {
 			return err
 		}
 		defer f.Close()
-		err = tmpl.ExecuteTemplate(f, "template."+ext, data)
+		err = tmpl.ExecuteTemplate(f, "_template."+ext, data)
 		if err != nil {
 			return err
 		}
