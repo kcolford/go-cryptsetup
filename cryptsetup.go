@@ -2,10 +2,14 @@ package cryptsetup
 
 // #cgo pkg-config: libcryptsetup
 // #include <libcryptsetup.h>
-// #include <stdlib.h>
 import "C"
+import "time"
 
-// Device is a handle on the crypto device
+// Device is a handle on the crypto device.
+//
+// It is not safe to use any Device.* methods in parallel. It is the
+// caller's responsibility that all calls to the same device returned
+// by NewDevice are serialized.
 type Device struct {
 	cd *C.struct_crypt_device
 }
@@ -14,10 +18,7 @@ type Device struct {
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
 func NewDevice(name string) (d Device, err error) {
-	_name := cString(name)
-	defer cStringFree(_name)
-	ival := C.crypt_init(&d.cd, _name)
-	err = newError(int(ival), nil)
+	err = d.init(name)
 	return
 }
 
@@ -28,8 +29,13 @@ func (d *Device) Close() {
 }
 
 // Load loads the device header into the device context.
-func (d *Device) Load() error {
-	return d.load("", nil)
+func (d *Device) Load(p CryptParameter) error {
+	if p == nil {
+		return d.load(nil, nil)
+	}
+	t, _, params, free := p.CMode()
+	defer free()
+	return d.load(&t, params)
 }
 
 // Format formats the block device
@@ -40,9 +46,9 @@ func (d *Device) Format(key []byte, p CryptParameter) error {
 		t,
 		pp.Cipher,
 		pp.Mode,
-		"",		      // generate the uuid
-		nil,		      // generate the volume key
-		pp.VolumeKeyBits / 8, // 256bit volume key
+		nil,		  // generate the uuid
+		nil,		  // generate the volume key
+		pp.VolumeKeySize, // 256bit volume key
 		params,
 	)
 	if err != nil {
@@ -60,14 +66,14 @@ func (d *Device) Format(key []byte, p CryptParameter) error {
 // Benchmark runs the library's internal benchmarking code on the
 // underlying block device with the given parameters. It returns the
 // number of MiB encrypted and decrypted per-second.
-func (d *Device) Benchmark(iv_bits uintptr, buffer_size uintptr, pp Params) (enc float64, dec float64, err error) {
+func (d *Device) Benchmark(iv_size uint64, buffer_size uint64, pp Params) (enc float64, dec float64, err error) {
 	pp.def()
 	var cenc, cdec C.double
 	err = d.benchmark(
 		pp.Cipher,
 		pp.Mode,
-		pp.VolumeKeyBits / 8,
-		iv_bits / 8,
+		pp.VolumeKeySize,
+		iv_size,
 		buffer_size,
 		&cenc,
 		&cdec,
@@ -87,9 +93,7 @@ func (d *Device) BenchmarkKdf(hash string, pass, salt []byte) (iter uint64, err 
 	if hash == "" {
 		hash = DefaultHash
 	}
-	var citer C.uint64_t
-	err = d.benchmarkKdf("pbkdf2", hash, pass, salt, &citer)
-	iter = uint64(iter)
+	err = d.benchmarkKdf("pbkdf2", hash, pass, salt, (*C.uint64_t)(&iter))
 	return
 }
 
@@ -102,7 +106,7 @@ func Dir() string {
 // specified by Dir().
 func (d *Device) Activate(name string, pass []byte) error {
 	_, err := d.activateByPassphrase(
-		name,
+		&name,
 		C.CRYPT_ANY_SLOT,
 		pass,
 		0,
@@ -122,14 +126,9 @@ func (d *Device) Name() string {
 	return C.GoString(C.crypt_get_device_name(d.cd))
 }
 
-// Uuid returns the UUID of the device. It may return the empty string
-// if the device's UUID has not been set.
+// Uuid returns the UUID of the device.
 func (d *Device) Uuid() string {
-	out := C.crypt_get_uuid(d.cd)
-	if out != nil {
-		return C.GoString(out)
-	}
-	return ""
+	return C.GoString(C.crypt_get_uuid(d.cd))
 }
 
 // SetUuid sets the uuid of the device
@@ -142,6 +141,30 @@ func (d *Device) SetUuid(uuid string) error {
 func (d *Device) Params() (pp Params) {
 	pp.Cipher = C.GoString(C.crypt_get_cipher(d.cd))
 	pp.Mode = C.GoString(C.crypt_get_cipher_mode(d.cd))
-	pp.VolumeKeyBits = uintptr(C.crypt_get_volume_key_size(d.cd))
+	pp.VolumeKeySize = uint64(C.crypt_get_volume_key_size(d.cd))
+	return
+}
+
+// SetIterationTime sets how log it should take to construct a key
+// from a password. The default is about 1 second.
+func (d *Device) SetIterationTime(t time.Duration) {
+	C.crypt_set_iteration_time(d.cd, C.uint64_t(t.Seconds() * 1000))
+}
+
+func (d *Device) SetDataDevice(name string) error {
+	return d.setDataDevice(name)
+}
+
+func (d *Device) AddKey(pass []byte, newpass []byte) error {
+	_, err := d.keyslotAddByPassphrase(C.CRYPT_ANY_SLOT, pass, newpass)
+	return err
+}
+
+func (d *Device) DelKey(pass []byte) (err error) {
+	i, err := d.activateByPassphrase(nil, C.CRYPT_ANY_SLOT, pass, 0)
+	if err != nil {
+		return
+	}
+	err = d.keyslotDestroy(i)
 	return
 }

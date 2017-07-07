@@ -21,7 +21,7 @@ type CryptParameter interface {
 type Params struct {
 	Cipher        string
 	Mode          string
-	VolumeKeyBits uintptr
+	VolumeKeySize uint64
 }
 
 func (pp *Params) def() {
@@ -31,8 +31,8 @@ func (pp *Params) def() {
 	if pp.Mode == "" {
 		pp.Mode = DefaultMode
 	}
-	if pp.VolumeKeyBits == 0 {
-		pp.VolumeKeyBits = 256
+	if pp.VolumeKeySize == 0 {
+		pp.VolumeKeySize = 256 / 8
 	}
 }
 
@@ -53,7 +53,7 @@ func (p PlainParams) CMode() (t string, pp Params, out unsafe.Pointer, free func
 	t = C.CRYPT_PLAIN
 	pp = p.Params
 	s := C.struct_crypt_params_plain{
-		hash:   cString(p.Hash),
+		hash:   C.CString(p.Hash),
 		offset: C.uint64_t(p.Offset),
 		skip:   C.uint64_t(p.Skip),
 		size:   C.uint64_t(p.Size),
@@ -61,17 +61,17 @@ func (p PlainParams) CMode() (t string, pp Params, out unsafe.Pointer, free func
 	out = C.malloc(C.sizeof_struct_crypt_params_plain)
 	*(*C.struct_crypt_params_plain)(out) = s
 	free = func() {
-		cBytesFree(out)
-		cStringFree(s.hash)
+		C.free(out)
+		C.free(unsafe.Pointer(s.hash))
 	}
 	return
 }
 
 type LuksParams struct {
 	Params
-	Hash          string // hash used in LUKS header
-	DataAlignment uint64 // data alignment (in sectors)
-	DataDevice    string // detached encrypted data device or ""
+	Hash          string  // hash used in LUKS header
+	DataAlignment uint64  // data alignment (in sectors)
+	DataDevice    *string // detached encrypted data device or ""
 }
 
 func (p LuksParams) CMode() (t string, pp Params, out unsafe.Pointer, free func()) {
@@ -83,16 +83,22 @@ func (p LuksParams) CMode() (t string, pp Params, out unsafe.Pointer, free func(
 	t = C.CRYPT_LUKS1
 	pp = p.Params
 	s := C.struct_crypt_params_luks1{
-		hash:           cString(p.Hash),
+		hash:           C.CString(p.Hash),
 		data_alignment: C.size_t(p.DataAlignment),
-		data_device:    cString(p.DataDevice),
+		data_device:    nil,
+	}
+	if p.DataDevice != nil {
+		s.data_device = C.CString(*p.DataDevice)
 	}
 	out = C.malloc(C.sizeof_struct_crypt_params_luks1)
 	*(*C.struct_crypt_params_luks1)(out) = s
 	free = func() {
-		cBytesFree(out)
-		cStringFree(s.hash)
-		cStringFree(s.data_device)
+		C.free(out)
+		C.free(unsafe.Pointer(s.hash))
+		if s.data_device != nil {
+			C.free(unsafe.Pointer(s.data_device))
+		}
+
 	}
 	return
 }

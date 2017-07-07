@@ -26,9 +26,6 @@ func golang_gocrypt_log_default(msg *C.char) {
 
 //export golang_gocrypt_log
 func golang_gocrypt_log(msg *C.char, ls **C.struct_gocrypt_logstack) {
-	if ls == nil {
-		panic("nil value passed as reference")
-	}
 	out := (*C.struct_gocrypt_logstack)(C.malloc(C.sizeof_struct_gocrypt_logstack))
 	out.message = C.CString(C.GoString(msg))
 	out.prev = *ls

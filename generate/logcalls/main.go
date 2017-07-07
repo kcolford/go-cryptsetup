@@ -26,6 +26,9 @@ type MethodParam struct {
 
 	// this parameter is unsafe
 	Unsafe bool
+
+	CanNil bool
+	Assert string
 }
 
 type Method struct {
@@ -41,6 +44,9 @@ type Method struct {
 	// (negative errno) but sometimes they return a meaningful
 	// result too. this is the type of that meaningful result
 	Return string
+
+	SetContext    bool
+	CanNilContext bool
 }
 
 type Field struct {
@@ -76,33 +82,31 @@ func init() {
 
 var data = Data{
 	Methods: []Method{
+		// initialization
+		{Name: "crypt_init", Params: []MethodParam{
+			{Type: "const char *", Name: "name"},
+		}, SetContext: true, CanNilContext: true},
+
 		// formatting
 		{Name: "crypt_format", Params: []MethodParam{
 			{Type: "const char *", Name: "format"},
 			{Type: "const char *", Name: "cipher"},
 			{Type: "const char *", Name: "cipher_mode"},
-			{Type: "const char *", Name: "uuid"},
+			{Type: "const char *", Name: "uuid", CanNil: true},
 
-			// XXX: note that we don't force this argument
-			// because volume_key can be nil (NULL) and we
-			// specify a length that will be generated,
-			// care must be taken that the []byte slice
-			// passed to volume_key matches the size
-			// passed to volume_key_size if volume_key is
-			// not nil
-			{Type: "void *", Name: "volume_key"},
-			{Type: "size_t", Name: "volume_key_size"},
+			{Type: "void *", Name: "volume_key", CanNil: true},
+			{Type: "size_t", Name: "volume_key_size",
+				Assert: "(volume_key == nil && volume_key_size != 0) || (volume_key != nil && (volume_key_size == 0 || volume_key_size == len(volume_key)))"},
 
 			// this can be a pointer to any of a number of
 			// types, therefore it must be managed as an
 			// unsafe pointer
-			{Type: "void *", Name: "params",
-				Unsafe: true},
+			{Type: "void *", Name: "params", Unsafe: true},
 		}},
 		{Name: "crypt_load", Params: []MethodParam{
-			{Type: "const char *", Name: "requested_type"},
+			{Type: "const char *", Name: "requested_type", CanNil: true},
 			{Type: "void *", Name: "params",
-				Unsafe: true},
+				Unsafe: true, CanNil: true},
 		}},
 
 		// misc
@@ -110,11 +114,14 @@ var data = Data{
 		{Name: "crypt_set_uuid", Params: []MethodParam{
 			{Type: "const char *", Name: "uuid"},
 		}},
+		{Name: "crypt_set_data_device", Params: []MethodParam{
+			{Type: "const char *", Name: "name"},
+		}},
 
 		// keyslot managment
 		{Name: "crypt_keyslot_add_by_passphrase", Params: []MethodParam{
 			{Type: "int", Name: "keyslot"},
-			{Type: "void *", Name: "passphrase"},
+			{Type: "void *", Name: "passphrase", CanNil: true},
 			{Type: "size_t", Name: "passphrase_size",
 				ForceArg: "len(passphrase)"},
 			{Type: "void *", Name: "new_passphrase"},
@@ -127,13 +134,17 @@ var data = Data{
 
 		// device activation
 		{Name: "crypt_activate_by_passphrase", Params: []MethodParam{
-			{Type: "const char *", Name: "name"},
+			{Type: "const char *", Name: "name", CanNil: true},
 			{Type: "int", Name: "keyslot"},
 			{Type: "void *", Name: "passphrase"},
 			{Type: "size_t", Name: "passphrase_size",
 				ForceArg: "len(passphrase)"},
 			{Type: "uint32_t", Name: "flags"},
 		}, Return: "int"},
+		{Name: "crypt_get_active_device", Params: []MethodParam{
+			{Type: "const char *", Name: "name"},
+			{Type: "struct crypt_active_device *", Name: "cad"},
+		}},
 		{Name: "crypt_deactivate", Params: []MethodParam{
 			{Type: "const char *", Name: "name"},
 		}},
@@ -210,6 +221,10 @@ func (p MethodParam) CType() string {
 	return s
 }
 
+func (p MethodParam) IsPointer() bool {
+	return p.GoType()[0] == '*' || p.GoType()[0] == '['
+}
+
 // GoType returns the Go type used for the parameter.
 func (p MethodParam) GoType() string {
 	if p.Unsafe {
@@ -217,17 +232,26 @@ func (p MethodParam) GoType() string {
 	}
 	switch p.Type {
 	case "const char *":
+		if p.CanNil {
+			return "*string"
+		}
 		return "string"
 	case "void *":
 		return "[]byte"
 	case "size_t":
-		return "uintptr"
-	case "uint64_t":
 		return "uint64"
+	case "int64_t":
+		fallthrough
+	case "int32_t":
+		fallthrough
+	case "uint32_t":
+		fallthrough
+	case "uint64_t":
+		fallthrough
 	case "bool":
 		fallthrough
 	case "int":
-		return p.Type
+		return strings.TrimSuffix(p.Type, "_t")
 	default:
 		return p.CType()
 	}
