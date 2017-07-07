@@ -11,7 +11,7 @@ func ExampleDevice_Benchmark() {
 	}
 	defer d.Close()
 
-	enc, dec, err := d.Benchmark(128, 4096)
+	enc, dec, err := d.Benchmark(128, 4096, Params{})
 	if err != nil {
 		panic(err)
 	}
@@ -26,7 +26,7 @@ func ExampleDevice_BenchmarkKdf() {
 	}
 	defer d.Close()
 
-	iter, err := d.BenchmarkKdf([]byte("my password"), []byte("secure salt"))
+	iter, err := d.BenchmarkKdf("", []byte("my password"), []byte("secure salt"))
 	if err != nil {
 		panic(err)
 	}

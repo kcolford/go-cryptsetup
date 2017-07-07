@@ -16,17 +16,11 @@ func (d Device) {{.GoName}}({{range $k, $v := .DeclParams}}{{if $k}}, {{end}}{{$
 	arglist := (*C.struct_gocrypt_logstack)(nil)
 	{{range .Params}}
 	{{if eq "string" (.GoType)}}
-	_{{.Name}} := (*C.char)(nil)
-	if {{.Value}} != "" {
-		_{{.Name}} = C.CString({{.Value}})
-		defer C.free(unsafe.Pointer(_{{.Name}}))
-	}
+	_{{.Name}} := cString({{.Value}})
+	defer cStringFree(_{{.Name}})
 	{{else if eq "[]byte" (.GoType)}}
-	_{{.Name}} := unsafe.Pointer(nil)
-	if {{.Value}} != nil {
-		_{{.Name}} = C.CBytes({{.Value}})
-		defer C.free(_{{.Name}})
-	}
+	_{{.Name}} := cBytes({{.Value}})
+	defer cBytesFree(_{{.Name}})
 	{{else}}
 	_{{.Name}} := ({{.CType}})({{.Value}})
 	{{end}}
@@ -37,7 +31,8 @@ func (d Device) {{.GoName}}({{range $k, $v := .DeclParams}}{{if $k}}, {{end}}{{$
 		d.cd,
 		{{range .Params}}
 		_{{.Name}},
-		{{end}})
+		{{end}}
+	)
 	
 	err = newError(int(ival), logMessages(arglist))
 	{{with .Return}}out = ({{.}})(ival){{end}}

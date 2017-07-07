@@ -10,60 +10,14 @@ import (
 
 // Device is a handle on the crypto device
 type Device struct {
-
 	cd *C.struct_crypt_device
-
-	// VolumeKeyBits is the number of in the master volume
-	// key. This field is only relevant when formatting the
-	// device.
-	VolumeKeyBits uint
-
-	// Cipher is the symmetric cypher used to encrypt the
-	// device.
-	//
-	// Refer to /proc/crypto for valid values of this field.
-	Cipher string
-
-	// CipherMode is the mode of operation for the Cipher. See the
-	// Wikipedia article
-	// https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation
-	// for more information on how to use this.
-	//
-	// Refer to /proc/crypto for valid values of this field.
-	CipherMode string
-
-	// Hash is the cryptographic hash function used for verifying
-	// the decrypted Luks volume key. Without a hash of the volume
-	// key it would be impossible to guarantee whether or not a
-	// correct password was used to decrypt the drive (which could
-	// lead to us accidentally corrupting said drive).
-	//
-	// Refer to /proc/crypto for valid values of this field.
-	Hash string
-
-	// Kdf is the Key Deriviation Function used to convert a given
-	// password/keyfile into a key for decrypting
-	Kdf string
 }
-
-const DefaultVolumeKeyBits = 256
-const DefaultCipher = "aes"
-const DefaultCipherMode = "xts-plain64"
-const DefaultHash = "sha256"
-const DefaultKdf = "pbkdf2"
 
 // NewDevice creates a new device based on the name of a file/block
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
 func NewDevice(name string) (d *Device, err error) {
-	d = &Device{
-		VolumeKeyBits: DefaultVolumeKeyBits,
-		Cipher: DefaultCipher,
-		CipherMode: DefaultCipherMode,
-		Hash: DefaultHash,
-		Kdf: DefaultKdf,
-	}
-	
+	d = &Device{}
 	_name := (*C.char)(nil)
 	if name != "" {
 		_name = C.CString(name)
@@ -81,24 +35,22 @@ func (d *Device) Close() {
 }
 
 // Format formats the block device
-func (d *Device) Format(key []byte) error {
-	params := &C.struct_crypt_params_luks1{
-		hash: C.CString(d.Hash),
-	}
-	defer C.free(unsafe.Pointer(params.hash)) // free the C memory we allocated
+func (d *Device) Format(key []byte, p CryptParameter) error {
+	t, pp, params, free := p.CMode()
+	defer free()
 	err := d.format(
-		C.CRYPT_LUKS1,	// luks is what we want to use
-		d.Cipher,
-		d.CipherMode,
-		"",		// generate the uuid
-		nil,		// generate the volume key
-		C.size_t(d.VolumeKeyBits / 8),
-		unsafe.Pointer(params), // the above parameters...
+		t,
+		pp.Cipher,
+		pp.Mode,
+		"",		      // generate the uuid
+		nil,		      // generate the volume key
+		pp.VolumeKeyBits / 8, // 256bit volume key
+		params,
 	)
 	if err != nil {
 		return err
 	}
-	_, err = d.keyslotAddByVolumeKey(
+	_, err = d.keyslotAddByPassphrase(
 		C.CRYPT_ANY_SLOT, // use the first available key slot
 		nil,		  // use the saved volume key from
 				  // formatting
@@ -107,21 +59,34 @@ func (d *Device) Format(key []byte) error {
 	return err
 }
 
+func (d *Device) Load(p CryptParameter) error {
+	if p == nil {
+		return d.load("", nil)
+	}
+	t, _, params, free := p.CMode()
+	defer free()
+	return d.load(t, params)
+}
+		
+
 // Benchmark runs the library's internal benchmarking code on the
 // underlying block device with the given parameters. It returns the
 // number of MiB encrypted and decrypted per-second.
-func (d *Device) Benchmark(iv_bits uint, buffer_size uint64) (float64, float64, error) {
-	var enc, dec C.double
-	err := d.benchmark(
-		d.Cipher,
-		d.CipherMode,
-		C.size_t(d.VolumeKeyBits / 8),
-		C.size_t(iv_bits / 8),
-		C.size_t(buffer_size),
-		&enc,
-		&dec,
+func (d *Device) Benchmark(iv_bits uintptr, buffer_size uintptr, pp Params) (enc float64, dec float64, err error) {
+	pp.def()
+	var cenc, cdec C.double
+	err = d.benchmark(
+		pp.Cipher,
+		pp.Mode,
+		pp.VolumeKeyBits / 8,
+		iv_bits / 8,
+		buffer_size,
+		&cenc,
+		&cdec,
 	)
-	return float64(enc), float64(dec), err
+	enc = float64(cenc)
+	dec = float64(cdec)
+	return
 }
 
 // BenchmarkKdb runs the the library's internal benchmark code for the
@@ -130,9 +95,55 @@ func (d *Device) Benchmark(iv_bits uint, buffer_size uint64) (float64, float64, 
 //
 // The number of hashes indicates the difficulty of bruteforcing the
 // password; higher is more difficult to crack.
-func (d *Device) BenchmarkKdf(pass, salt []byte) (uint64, error) {
-	var iter C.uint64_t
-	err := d.benchmarkKdf(d.Kdf, d.Hash, pass, salt, &iter)
-	return uint64(iter), err
+func (d *Device) BenchmarkKdf(hash string, pass, salt []byte) (iter uint64, err error) {
+	if hash == "" {
+		hash = DefaultHash
+	}
+	var citer C.uint64_t
+	err = d.benchmarkKdf("pbkdf2", hash, pass, salt, &citer)
+	iter = uint64(iter)
+	return
 }
 
+// Dir returns the directory were the decrypted devices are placed.
+func Dir() string {
+	return C.GoString(C.crypt_get_dir())
+}
+
+// Activate sets up the encrypted volume as name under the directory
+// specified by Dir().
+func (d *Device) Activate(name string, pass []byte) error {
+	_, err := d.activateByPassphrase(
+		name,
+		C.CRYPT_ANY_SLOT,
+		pass,
+		0,
+	)
+	return err
+}
+
+// Deactivate removes the active device-mapper mapping from the
+// kernel. This also removes sensitive data from memory.
+func (d *Device) Deactivate(name string) error {
+	return d.deactivate(name)
+}
+
+// name returns the name of the underlying device. This is the same as
+// the argument passed to NewDevice.
+func (d *Device) Name() string {
+	return C.GoString(C.crypt_get_device_name(d.cd))
+}
+
+// Uuid returns the UUID of the device. It may return the empty string
+// if the device's UUID has not been set.
+func (d *Device) Uuid() string {
+	out := C.crypt_get_uuid(d.cd)
+	if out != nil {
+		return C.GoString(out)
+	}
+	return ""
+}
+
+func (d *Device) SetUuid(uuid string) error {
+	return d.setUuid(uuid)
+}

@@ -43,6 +43,16 @@ type Method struct {
 	Return string
 }
 
+type Field struct {
+	Type string
+	Name string
+}
+
+type Structure struct {
+	Name   string
+	Fields []Field
+}
+
 type Data struct {
 	Methods     []Method
 	Now         string
@@ -96,9 +106,6 @@ var data = Data{
 		}},
 
 		// misc
-		{Name: "crypt_set_data_device", Params: []MethodParam{
-			{Type: "const char *", Name: "device"},
-		}},
 		{Name: "crypt_get_rng_type", Return: "int"},
 		{Name: "crypt_set_uuid", Params: []MethodParam{
 			{Type: "const char *", Name: "uuid"},
@@ -114,34 +121,6 @@ var data = Data{
 			{Type: "size_t", Name: "new_passphrase_size",
 				ForceArg: "len(new_passphrase)"},
 		}, Return: "int"},
-		{Name: "crypt_keyslot_change_by_passphrase", Params: []MethodParam{
-			{Type: "int", Name: "keyslot_old"},
-			{Type: "int", Name: "keyslot_new"},
-			{Type: "void *", Name: "passphrase"},
-			{Type: "size_t", Name: "passphrase_size",
-				ForceArg: "len(passphrase)"},
-			{Type: "void *", Name: "new_passphrase"},
-			{Type: "size_t", Name: "new_passphrase_size",
-				ForceArg: "len(new_passphrase)"},
-		}, Return: "int"},
-		{Name: "crypt_keyslot_add_by_keyfile_offset", Params: []MethodParam{
-			{Type: "int", Name: "keyslot"},
-			{Type: "const char *", Name: "keyfile"},
-			{Type: "size_t", Name: "keyfile_size"},
-			{Type: "size_t", Name: "keyfile_offset"},
-			{Type: "const char *", Name: "new_keyfile"},
-			{Type: "size_t", Name: "new_keyfile_size"},
-			{Type: "size_t", Name: "new_keyfile_offset"},
-		}},
-		{Name: "crypt_keyslot_add_by_volume_key", Params: []MethodParam{
-			{Type: "int", Name: "keyslot"},
-			{Type: "void *", Name: "volume_key"},
-			{Type: "size_t", Name: "volume_key_size",
-				ForceArg: "len(volume_key)"},
-			{Type: "void *", Name: "passphrase"},
-			{Type: "size_t", Name: "passphrase_size",
-				ForceArg: "len(passphrase)"},
-		}, Return: "int"},
 		{Name: "crypt_keyslot_destroy", Params: []MethodParam{
 			{Type: "int", Name: "keyslot"},
 		}},
@@ -153,14 +132,6 @@ var data = Data{
 			{Type: "void *", Name: "passphrase"},
 			{Type: "size_t", Name: "passphrase_size",
 				ForceArg: "len(passphrase)"},
-			{Type: "uint32_t", Name: "flags"},
-		}, Return: "int"},
-		{Name: "crypt_activate_by_keyfile_offset", Params: []MethodParam{
-			{Type: "const char *", Name: "name"},
-			{Type: "int", Name: "keyslot"},
-			{Type: "const char *", Name: "keyfile"},
-			{Type: "size_t", Name: "keyfile_size"},
-			{Type: "size_t", Name: "keyfile_offset"},
 			{Type: "uint32_t", Name: "flags"},
 		}, Return: "int"},
 		{Name: "crypt_deactivate", Params: []MethodParam{
@@ -178,7 +149,6 @@ var data = Data{
 			{Type: "double *", Name: "decryption_mbs"},
 		}},
 		{Name: "crypt_benchmark_kdf", Params: []MethodParam{
-
 			{Type: "const char *", Name: "kdf"},
 			{Type: "const char *", Name: "hash"},
 			{Type: "void *", Name: "password"},
@@ -250,6 +220,10 @@ func (p MethodParam) GoType() string {
 		return "string"
 	case "void *":
 		return "[]byte"
+	case "size_t":
+		return "uintptr"
+	case "uint64_t":
+		return "uint64"
 	case "bool":
 		fallthrough
 	case "int":

@@ -40,7 +40,7 @@ func TestDevice_Format(t *testing.T) {
 			}
 			defer d.Close()
 
-			err = d.Format([]byte(pass))
+			err = d.Format([]byte(pass), LuksParams{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -73,7 +73,7 @@ func TestDevice_Format_error(t *testing.T) {
 	}
 	defer d.Close()
 
-	err = d.Format([]byte("password"))
+	err = d.Format([]byte("password"), LuksParams{})
 	if err == nil {
 		t.FailNow()
 	}

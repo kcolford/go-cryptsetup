@@ -21,13 +21,6 @@ int gocrypt_crypt_load(struct gocrypt_logstack **ls, struct crypt_device *cd, co
   return out;
 }
 
-int gocrypt_crypt_set_data_device(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * device) {
-  crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = crypt_set_data_device(cd, device);
-  crypt_set_log_callback(cd, gocrypt_log_default, NULL);
-  return out;
-}
-
 int gocrypt_crypt_get_rng_type(struct gocrypt_logstack **ls, struct crypt_device *cd) {
   crypt_set_log_callback(cd, gocrypt_log, ls);
   int out = crypt_get_rng_type(cd);
@@ -49,27 +42,6 @@ int gocrypt_crypt_keyslot_add_by_passphrase(struct gocrypt_logstack **ls, struct
   return out;
 }
 
-int gocrypt_crypt_keyslot_change_by_passphrase(struct gocrypt_logstack **ls, struct crypt_device *cd, int keyslot_old, int keyslot_new, void * passphrase, size_t passphrase_size, void * new_passphrase, size_t new_passphrase_size) {
-  crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = crypt_keyslot_change_by_passphrase(cd, keyslot_old, keyslot_new, passphrase, passphrase_size, new_passphrase, new_passphrase_size);
-  crypt_set_log_callback(cd, gocrypt_log_default, NULL);
-  return out;
-}
-
-int gocrypt_crypt_keyslot_add_by_keyfile_offset(struct gocrypt_logstack **ls, struct crypt_device *cd, int keyslot, const char * keyfile, size_t keyfile_size, size_t keyfile_offset, const char * new_keyfile, size_t new_keyfile_size, size_t new_keyfile_offset) {
-  crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = crypt_keyslot_add_by_keyfile_offset(cd, keyslot, keyfile, keyfile_size, keyfile_offset, new_keyfile, new_keyfile_size, new_keyfile_offset);
-  crypt_set_log_callback(cd, gocrypt_log_default, NULL);
-  return out;
-}
-
-int gocrypt_crypt_keyslot_add_by_volume_key(struct gocrypt_logstack **ls, struct crypt_device *cd, int keyslot, void * volume_key, size_t volume_key_size, void * passphrase, size_t passphrase_size) {
-  crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = crypt_keyslot_add_by_volume_key(cd, keyslot, volume_key, volume_key_size, passphrase, passphrase_size);
-  crypt_set_log_callback(cd, gocrypt_log_default, NULL);
-  return out;
-}
-
 int gocrypt_crypt_keyslot_destroy(struct gocrypt_logstack **ls, struct crypt_device *cd, int keyslot) {
   crypt_set_log_callback(cd, gocrypt_log, ls);
   int out = crypt_keyslot_destroy(cd, keyslot);
@@ -80,13 +52,6 @@ int gocrypt_crypt_keyslot_destroy(struct gocrypt_logstack **ls, struct crypt_dev
 int gocrypt_crypt_activate_by_passphrase(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * name, int keyslot, void * passphrase, size_t passphrase_size, uint32_t flags) {
   crypt_set_log_callback(cd, gocrypt_log, ls);
   int out = crypt_activate_by_passphrase(cd, name, keyslot, passphrase, passphrase_size, flags);
-  crypt_set_log_callback(cd, gocrypt_log_default, NULL);
-  return out;
-}
-
-int gocrypt_crypt_activate_by_keyfile_offset(struct gocrypt_logstack **ls, struct crypt_device *cd, const char * name, int keyslot, const char * keyfile, size_t keyfile_size, size_t keyfile_offset, uint32_t flags) {
-  crypt_set_log_callback(cd, gocrypt_log, ls);
-  int out = crypt_activate_by_keyfile_offset(cd, name, keyslot, keyfile, keyfile_size, keyfile_offset, flags);
   crypt_set_log_callback(cd, gocrypt_log_default, NULL);
   return out;
 }
