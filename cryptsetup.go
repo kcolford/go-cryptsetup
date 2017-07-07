@@ -4,9 +4,6 @@ package cryptsetup
 // #include <libcryptsetup.h>
 // #include <stdlib.h>
 import "C"
-import (
-	"unsafe"
-)
 
 // Device is a handle on the crypto device
 type Device struct {
@@ -16,13 +13,9 @@ type Device struct {
 // NewDevice creates a new device based on the name of a file/block
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
-func NewDevice(name string) (d *Device, err error) {
-	d = &Device{}
-	_name := (*C.char)(nil)
-	if name != "" {
-		_name = C.CString(name)
-		defer C.free(unsafe.Pointer(_name))
-	}
+func NewDevice(name string) (d Device, err error) {
+	_name := cString(name)
+	defer cStringFree(_name)
 	ival := C.crypt_init(&d.cd, _name)
 	err = newError(int(ival), nil)
 	return
@@ -32,6 +25,11 @@ func NewDevice(name string) (d *Device, err error) {
 // resources.
 func (d *Device) Close() {
 	C.crypt_free(d.cd)
+}
+
+// Load loads the device header into the device context.
+func (d *Device) Load() error {
+	return d.load("", nil)
 }
 
 // Format formats the block device
@@ -58,16 +56,6 @@ func (d *Device) Format(key []byte, p CryptParameter) error {
 	)
 	return err
 }
-
-func (d *Device) Load(p CryptParameter) error {
-	if p == nil {
-		return d.load("", nil)
-	}
-	t, _, params, free := p.CMode()
-	defer free()
-	return d.load(t, params)
-}
-		
 
 // Benchmark runs the library's internal benchmarking code on the
 // underlying block device with the given parameters. It returns the
@@ -144,6 +132,16 @@ func (d *Device) Uuid() string {
 	return ""
 }
 
+// SetUuid sets the uuid of the device
 func (d *Device) SetUuid(uuid string) error {
 	return d.setUuid(uuid)
+}
+
+// Params returns a Params object with the cryptographic parameters
+// used by the device.
+func (d *Device) Params() (pp Params) {
+	pp.Cipher = C.GoString(C.crypt_get_cipher(d.cd))
+	pp.Mode = C.GoString(C.crypt_get_cipher_mode(d.cd))
+	pp.VolumeKeyBits = uintptr(C.crypt_get_volume_key_size(d.cd))
+	return
 }

@@ -8,7 +8,7 @@ import (
 const luksSize = 1049600
 const tempFile = "/tmp/go-cryptsetup_cryptsetup_test_imagefile"
 
-func makeDeviceSize(luksSize int64) (d *Device, err error) {
+func makeDeviceSize(luksSize int64) (d Device, err error) {
 	f, err := os.Create(tempFile)
 	if err != nil {
 		return
@@ -21,7 +21,7 @@ func makeDeviceSize(luksSize int64) (d *Device, err error) {
 	return NewDevice(f.Name())
 }
 
-func makeDevice() (*Device, error) {
+func makeDevice() (Device, error) {
 	return makeDeviceSize(luksSize)
 }
 
