@@ -3,13 +3,12 @@ package cryptsetup
 // #cgo pkg-config: libcryptsetup
 // #include <libcryptsetup.h>
 import "C"
-import "time"
+import (
+	"time"
+)
 
-// Device is a handle on the crypto device.
-//
-// It is not safe to use any Device.* methods in parallel. It is the
-// caller's responsibility that all calls to the same device returned
-// by NewDevice are serialized.
+// Device is a handle on the crypto device. It corresponds to a
+// `struct crypt_device*` in libcryptsetup
 type Device struct {
 	cd *C.struct_crypt_device
 }
@@ -24,7 +23,7 @@ func init() {
 // NewDevice creates a new device based on the name of a file/block
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
-func NewDevice(name string) (d Device, err error) {
+func NewDevice(name string) (d *Device, err error) {
 	err = d.init(name)
 	return
 }
@@ -131,7 +130,7 @@ func (d *Device) Deactivate(name string) error {
 	return d.deactivate(name)
 }
 
-// name returns the name of the underlying device. This is the same as
+// Name returns the name of the underlying device. This is the same as
 // the argument passed to NewDevice.
 func (d *Device) Name() string {
 	return C.GoString(C.crypt_get_device_name(d.cd))
@@ -162,10 +161,13 @@ func (d *Device) SetIterationTime(t time.Duration) {
 	C.crypt_set_iteration_time(d.cd, C.uint64_t(t.Seconds() * 1000))
 }
 
+// SetDataDevice specifies a device to use in detached header mode.
 func (d *Device) SetDataDevice(name string) error {
 	return d.setDataDevice(name)
 }
 
+// AddKey adds a new password, newpass, to the block device, first
+// unlocking it with pass.
 func (d *Device) AddKey(pass []byte, newpass []byte) error {
 	if _, ok := <-firstInitStatus; ok {
 		defer close(firstInitStatus)
@@ -175,6 +177,12 @@ func (d *Device) AddKey(pass []byte, newpass []byte) error {
 	return err
 }
 
+// DelKey removes the password specified by pass from the device,
+// effectively making it impossible to decrypt the device with that
+// password any more. Note that this is not guaranteed to work on SSDs
+// and flash memory because the wear leveling technology used in those
+// devices makes it impossible to ensure complete erasure of the data
+// in a specific sector.
 func (d *Device) DelKey(pass []byte) (err error) {
 	i, err := d.activateByPassphrase(nil, C.CRYPT_ANY_SLOT, pass, 0)
 	if err != nil {
