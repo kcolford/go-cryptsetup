@@ -14,6 +14,13 @@ type Device struct {
 	cd *C.struct_crypt_device
 }
 
+// synchronize the first time secure memory is allocated, otherwise
+// libgcrypt's secure memory pool may be inititialized multiple times
+var firstInitStatus = make(chan int, 1)
+func init() {
+	firstInitStatus <- 0
+}
+
 // NewDevice creates a new device based on the name of a file/block
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
@@ -40,6 +47,10 @@ func (d *Device) Load(p CryptParameter) error {
 
 // Format formats the block device
 func (d *Device) Format(key []byte, p CryptParameter) error {
+	if _, ok := <-firstInitStatus; ok {
+		defer close(firstInitStatus)
+	}
+
 	t, pp, params, free := p.CMode()
 	defer free()
 	err := d.format(
@@ -156,6 +167,10 @@ func (d *Device) SetDataDevice(name string) error {
 }
 
 func (d *Device) AddKey(pass []byte, newpass []byte) error {
+	if _, ok := <-firstInitStatus; ok {
+		defer close(firstInitStatus)
+	}
+
 	_, err := d.keyslotAddByPassphrase(C.CRYPT_ANY_SLOT, pass, newpass)
 	return err
 }
