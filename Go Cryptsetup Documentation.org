@@ -1,0 +1,29 @@
+* Overview
+  :PROPERTIES:
+  :EXPORT_FILE_NAME: README
+  :END:
+
+  The go-cryptsetup package is designed to provide golang bindings to
+  the cryptsetup library. The cryptsetup library is what provides
+  access to encrypted hard drives on the linux kernel and provides
+  some of the best encryption for protecting a hard drive from an
+  attacker with physical access to the device (and not enough time for
+  a full firmware hack plus arranging for the unsuspecting user to
+  enter their password).
+
+** Install
+  This project can be easily installed with just
+
+  #+BEGIN_SRC shell
+go get -u github.com/kcolford/go-cryptsetup  
+  #+END_SRC
+
+** Hacking
+   The project is maintained on Github. Pull requests will gladly be
+   accepted.
+   
+   Please remember to run ~go generate~ to rebuild the generated source
+   code. The generated files are committed to the repository as per the
+   recommendations of the Go documentation.
+
+   
