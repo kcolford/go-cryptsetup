@@ -24,6 +24,7 @@ func init() {
 // device to encrypt. It is the caller's responsibility to ensure that
 // `Close` gets called on the device (or a copy of the device).
 func NewDevice(name string) (d *Device, err error) {
+	d = new(Device)
 	err = d.init(name)
 	return
 }
@@ -93,7 +94,7 @@ func (d *Device) Benchmark(iv_size uint64, buffer_size uint64, pp Params) (enc f
 	return
 }
 
-// BenchmarkKdb runs the the library's internal benchmark code for the
+// BenchmarkKdf runs the the library's internal benchmark code for the
 // Key Deriviation Function. It returns the number hashes performed in
 // one second on the password with the given salt.
 //
