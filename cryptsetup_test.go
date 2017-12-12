@@ -9,7 +9,7 @@ import (
 
 const luksSize = 1049600
 
-func freeme(d Device, f *os.File) {
+func freeme(d *Device, f *os.File) {
 	d.Close()
 	err := os.Remove(f.Name())
 	if err != nil {
@@ -21,7 +21,7 @@ func freeme(d Device, f *os.File) {
 	}
 }
 
-func makeDeviceSize(luksSize int64) (d Device, f *os.File, err error) {
+func makeDeviceSize(luksSize int64) (d *Device, f *os.File, err error) {
 	f, err = ioutil.TempFile("", "go-cryptsetup_testfile")
 	if err != nil {
 		return
@@ -42,7 +42,7 @@ func makeDeviceSize(luksSize int64) (d Device, f *os.File, err error) {
 	return
 }
 
-func makeDevice() (Device, *os.File, error) {
+func makeDevice() (*Device, *os.File, error) {
 	return makeDeviceSize(luksSize)
 }
 
